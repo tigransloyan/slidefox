@@ -1,0 +1,36 @@
+# Agent configuration
+input:
+  THEME:
+    type: string
+    description: Presentation theme
+    optional: true
+    default: modern
+
+triggers:
+  user-message:
+    description: User describes their presentation
+    input:
+      USER_MESSAGE:
+        type: string
+
+agent:
+  model: anthropic/claude-sonnet-4-5
+  system: system
+  input:
+    - THEME
+  imageModel: google/gemini-2.5-flash-image
+  agentic: true
+  maxSteps: 20
+
+handlers:
+  user-message:
+    Add user message:
+      block: add-message
+      role: user
+      prompt: user-message
+      input:
+        - USER_MESSAGE
+      display: hidden
+
+    Generate presentation:
+      block: next-message

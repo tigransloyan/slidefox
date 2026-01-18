@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --fox-orange: #FF6B35;
+  --fox-orange-light: #FF8F5C;
+  --warm-brown: #5D4037;
+  --cream-white: #FFF8F5;
+}
+
+body {
+  color: var(--warm-brown);
+  background: var(--cream-white);
+}
