@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Slidefox } from '@/components/Slidefox';
 import { SlideGallery } from '@/components/SlideGallery';
 import { ConversationHistory } from '@/components/ConversationHistory';
@@ -9,13 +9,46 @@ import { createSlidefoxSession, getSlidefoxSessionMessages } from './actions';
 import { saveSessionToStorage } from '@/lib/session';
 import type { UIMessage, UIFilePart } from '@/types';
 
+const MIN_GALLERY_WIDTH = 320;
+const MAX_GALLERY_WIDTH = 900;
+const DEFAULT_GALLERY_WIDTH = 576;
+
 export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [currentMessages, setCurrentMessages] = useState<UIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryWidth, setGalleryWidth] = useState(DEFAULT_GALLERY_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
   const hasAutoOpenedGallery = useRef(false);
+
+  // Handle gallery resize
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX;
+      setGalleryWidth(Math.min(MAX_GALLERY_WIDTH, Math.max(MIN_GALLERY_WIDTH, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Create a new session (called on demand, not on page load)
   // Note: We don't set isLoading here because Slidefox handles its own loading state
@@ -77,7 +110,7 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-cream-white">
+    <div className={`h-screen flex overflow-hidden bg-cream-white ${isResizing ? 'select-none cursor-ew-resize' : ''}`}>
       {/* Left Sidebar - Conversation History */}
       <ConversationHistory
         currentSessionId={sessionId ?? undefined}
@@ -99,7 +132,17 @@ export default function Home() {
 
       {/* Right Panel - Slide Gallery */}
       {isGalleryOpen ? (
-        <div className="w-[28rem] border-l border-warm-brown/10 bg-white flex flex-col transition-all">
+        <div 
+          className="border-l border-warm-brown/10 bg-white flex flex-col relative"
+          style={{ width: galleryWidth }}
+        >
+          {/* Resize handle */}
+          <div
+            onMouseDown={handleMouseDown}
+            className={`absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-fox-orange/30 transition-colors z-10 ${
+              isResizing ? 'bg-fox-orange/50' : ''
+            }`}
+          />
           <div className="p-4 border-b border-warm-brown/10 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <button

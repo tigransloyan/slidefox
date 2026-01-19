@@ -27,7 +27,7 @@ export function SlideGallery({ slides }: SlideGalleryProps) {
           {slides.map((slide, index) => (
             <div
               key={slide.id}
-              className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-fox-orange transition-all"
+              className="relative aspect-[7/4] bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-fox-orange transition-all"
               onClick={() => setSelectedSlide(slide)}
             >
               <Image

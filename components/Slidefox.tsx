@@ -199,7 +199,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
         {renderParts.map((part) => {
           if (part.type === 'text') {
             return (
-              <div key={part.key} className="prose prose-sm max-w-none">
+              <div key={part.key} className={`prose max-w-none ${isUser ? 'prose-invert' : ''}`}>
                 <ReactMarkdown>{part.text}</ReactMarkdown>
               </div>
             );
