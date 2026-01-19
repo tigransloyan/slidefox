@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useOctavusChat, createHttpTransport, type UIMessage } from '@octavus/react';
+import { useOctavusChat, createHttpTransport, type UIMessage, type UIToolCallPart } from '@octavus/react';
 import ReactMarkdown from 'react-markdown';
 import Image from 'next/image';
 
@@ -160,6 +160,33 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
 function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === 'user';
 
+  // Group consecutive tool calls together for inline rendering
+  const renderParts: Array<{ type: 'text'; text: string; key: number } | { type: 'tool-group'; toolCalls: UIToolCallPart[]; key: number }> = [];
+  let currentToolGroup: UIToolCallPart[] = [];
+
+  message.parts.forEach((part) => {
+    if (part.type === 'text') {
+      // Flush any pending tool group before adding text
+      if (currentToolGroup.length > 0) {
+        renderParts.push({ type: 'tool-group', toolCalls: [...currentToolGroup], key: renderParts.length });
+        currentToolGroup = [];
+      }
+      renderParts.push({ type: 'text', text: part.text, key: renderParts.length });
+    } else if (part.type === 'tool-call' && part.toolName === 'octavus_generate_image') {
+      currentToolGroup.push(part);
+    }
+  });
+
+  // Flush remaining tool group at the end
+  if (currentToolGroup.length > 0) {
+    renderParts.push({ type: 'tool-group', toolCalls: currentToolGroup, key: renderParts.length });
+  }
+
+  // Collect all image generation tool calls for progress tracking
+  const allToolCalls = message.parts.filter(
+    (p): p is UIToolCallPart => p.type === 'tool-call' && p.toolName === 'octavus_generate_image',
+  );
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -169,21 +196,137 @@ function MessageBubble({ message }: { message: UIMessage }) {
             : 'bg-white border border-warm-brown/10 text-warm-brown'
         }`}
       >
-        {message.parts.map((part, i) => {
+        {renderParts.map((part) => {
           if (part.type === 'text') {
             return (
-              <div key={i} className="prose prose-sm max-w-none">
+              <div key={part.key} className="prose prose-sm max-w-none">
                 <ReactMarkdown>{part.text}</ReactMarkdown>
               </div>
+            );
+          } else if (part.type === 'tool-group') {
+            return (
+              <SlideProgressGroup
+                key={part.key}
+                toolCalls={part.toolCalls}
+                allToolCalls={allToolCalls}
+              />
             );
           }
           return null;
         })}
 
-        {message.status === 'streaming' && (
-          <span className="inline-block w-2 h-4 bg-current opacity-50 animate-pulse ml-1" />
+        {message.status === 'streaming' && allToolCalls.length === 0 && (
+          <StreamingIndicator hasText={renderParts.some((p) => p.type === 'text' && p.text.trim())} />
         )}
       </div>
+    </div>
+  );
+}
+
+function SlideProgressGroup({
+  toolCalls,
+  allToolCalls,
+}: {
+  toolCalls: UIToolCallPart[];
+  allToolCalls: UIToolCallPart[];
+}) {
+  const completedSlides = allToolCalls.filter((p) => p.status === 'done').length;
+  const totalSlides = allToolCalls.length;
+  const hasActiveImageGeneration = allToolCalls.some(
+    (p) => p.status === 'pending' || p.status === 'running',
+  );
+
+  // Calculate the starting index for this group's slides
+  const firstToolCallId = toolCalls[0]?.toolCallId;
+  const startIndex = allToolCalls.findIndex((t) => t.toolCallId === firstToolCallId);
+
+  return (
+    <div className="my-3 py-3 border-y border-warm-brown/10">
+      <div className="flex items-center gap-2 text-sm">
+        {hasActiveImageGeneration ? (
+          <>
+            <span className="h-2 w-2 animate-pulse rounded-full bg-fox-orange" />
+            <span className="text-warm-brown/70">
+              Generating slides... {completedSlides}/{totalSlides}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-green-600">✓</span>
+            <span className="text-warm-brown/70">
+              {totalSlides} slide{totalSlides !== 1 ? 's' : ''} generated
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Individual slide progress */}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {toolCalls.map((toolCall, i) => (
+          <SlideProgressBadge
+            key={toolCall.toolCallId}
+            index={startIndex + i + 1}
+            toolCall={toolCall}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SlideProgressBadge({ index, toolCall }: { index: number; toolCall: UIToolCallPart }) {
+  const statusStyles = {
+    pending: 'bg-gray-100 text-gray-400',
+    running: 'bg-fox-orange/10 text-fox-orange animate-pulse',
+    done: 'bg-green-50 text-green-600',
+    error: 'bg-red-50 text-red-600',
+    cancelled: 'bg-amber-50 text-amber-600',
+  };
+
+  const statusIcons = {
+    pending: '○',
+    running: '◐',
+    done: '✓',
+    error: '✗',
+    cancelled: '◼',
+  };
+
+  return (
+    <div
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[toolCall.status]}`}
+      title={`Slide ${index}: ${toolCall.status}`}
+    >
+      <span className={toolCall.status === 'running' ? 'animate-spin' : ''}>
+        {statusIcons[toolCall.status]}
+      </span>
+      <span>Slide {index}</span>
+    </div>
+  );
+}
+
+function StreamingIndicator({ hasText }: { hasText: boolean }) {
+  if (hasText) {
+    // Show blinking cursor when text is already streaming
+    return (
+      <span className="inline-block w-0.5 h-4 bg-warm-brown/60 animate-pulse ml-0.5 align-middle" />
+    );
+  }
+
+  // Show typing dots when waiting for initial response
+  return (
+    <div className="flex items-center gap-1 py-1">
+      <span
+        className="w-2 h-2 rounded-full bg-fox-orange/60 animate-bounce"
+        style={{ animationDelay: '0ms', animationDuration: '600ms' }}
+      />
+      <span
+        className="w-2 h-2 rounded-full bg-fox-orange/60 animate-bounce"
+        style={{ animationDelay: '150ms', animationDuration: '600ms' }}
+      />
+      <span
+        className="w-2 h-2 rounded-full bg-fox-orange/60 animate-bounce"
+        style={{ animationDelay: '300ms', animationDuration: '600ms' }}
+      />
     </div>
   );
 }

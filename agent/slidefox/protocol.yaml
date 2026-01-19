@@ -1,10 +1,10 @@
 # Agent configuration
 input:
-  THEME:
+  STYLE:
     type: string
-    description: Presentation theme
+    description: Visual style for the presentation
     optional: true
-    default: modern
+    default: auto
 
 triggers:
   user-message:
@@ -17,7 +17,7 @@ agent:
   model: anthropic/claude-sonnet-4-5
   system: system
   input:
-    - THEME
+    - STYLE
   imageModel: google/gemini-2.5-flash-image
   agentic: true
   maxSteps: 20
