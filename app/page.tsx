@@ -6,8 +6,8 @@ import { SlideGallery } from '@/components/SlideGallery';
 import { ConversationHistory } from '@/components/ConversationHistory';
 import { PDFExport } from '@/components/PDFExport';
 import { createSlidefoxSession, getSlidefoxSessionMessages } from './actions';
-import { saveSessionToStorage } from '@/lib/session';
-import type { UIMessage, UIFilePart } from '@/types';
+import { getPresentations, savePresentation, deletePresentation } from '@/lib/storage';
+import type { UIMessage, UIFilePart, LocalPresentation } from '@/types';
 
 const MIN_GALLERY_WIDTH = 320;
 const MAX_GALLERY_WIDTH = 900;
@@ -15,6 +15,7 @@ const DEFAULT_GALLERY_WIDTH = 576;
 
 export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [presentations, setPresentations] = useState<LocalPresentation[]>([]);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [currentMessages, setCurrentMessages] = useState<UIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +23,11 @@ export default function Home() {
   const [galleryWidth, setGalleryWidth] = useState(DEFAULT_GALLERY_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const hasAutoOpenedGallery = useRef(false);
+
+  // Load presentations from localStorage on mount
+  useEffect(() => {
+    setPresentations(getPresentations());
+  }, []);
 
   // Handle gallery resize
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -51,20 +57,25 @@ export default function Home() {
   }, [isResizing]);
 
   // Create a new session (called on demand, not on page load)
-  // Note: We don't set isLoading here because Slidefox handles its own loading state
-  // and setting isLoading would unmount Slidefox, losing the pending message
   const handleNewSession = async (): Promise<string> => {
     const { sessionId: newSessionId } = await createSlidefoxSession();
+    const newPresentation: LocalPresentation = {
+      sessionId: newSessionId,
+      title: 'New Presentation',
+      createdAt: Date.now(),
+    };
+    savePresentation(newPresentation);
+    setPresentations(prev => [newPresentation, ...prev]);
     setSessionId(newSessionId);
     setInitialMessages([]);
     setCurrentMessages([]);
     hasAutoOpenedGallery.current = false;
-    saveSessionToStorage(newSessionId, 'New Presentation');
     return newSessionId;
   };
 
   // Load or restore a session
   const handleSelectSession = async (selectedSessionId: string) => {
+    if (selectedSessionId === sessionId) return; // Already on this session
     setIsLoading(true);
     try {
       const messages = await getSlidefoxSessionMessages(selectedSessionId);
@@ -78,6 +89,16 @@ export default function Home() {
     }
   };
 
+  // Delete a session
+  const handleDeleteSession = (sessionIdToDelete: string) => {
+    deletePresentation(sessionIdToDelete);
+    setPresentations(prev => prev.filter(p => p.sessionId !== sessionIdToDelete));
+    if (sessionIdToDelete === sessionId) {
+      setSessionId(null);
+      setInitialMessages([]);
+      setCurrentMessages([]);
+    }
+  };
 
   // Extract slides from current messages for gallery and PDF export
   const slides: UIFilePart[] = useMemo(() => {
@@ -114,8 +135,10 @@ export default function Home() {
       {/* Left Sidebar - Conversation History */}
       <ConversationHistory
         currentSessionId={sessionId ?? undefined}
+        presentations={presentations}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        onDeleteSession={handleDeleteSession}
       />
 
       {/* Center - Chat Interface */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useOctavusChat, createHttpTransport, type UIMessage, type UIToolCallPart } from '@octavus/react';
 import ReactMarkdown from 'react-markdown';
 import Image from 'next/image';
@@ -16,6 +16,12 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
   const [inputValue, setInputValue] = useState('');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  
+  // Refs for auto-scroll and auto-focus
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const userHasScrolledRef = useRef(false);
+  const wasStreamingRef = useRef(false);
 
   // Create transport with abort signal support for stop functionality
   // Transport is only valid when sessionId exists
@@ -60,6 +66,48 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
 
   const isStreaming = status === 'streaming';
 
+  // Detect if user is near bottom of scroll container
+  const isNearBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return true;
+    const threshold = 100; // pixels from bottom
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  }, []);
+
+  // Handle user scroll - detect when user manually scrolls up
+  const handleScroll = useCallback(() => {
+    if (!isStreaming) {
+      userHasScrolledRef.current = false;
+      return;
+    }
+    // If user scrolls away from bottom during streaming, respect their choice
+    userHasScrolledRef.current = !isNearBottom();
+  }, [isStreaming, isNearBottom]);
+
+  // Auto-scroll during streaming (respecting user scroll)
+  useEffect(() => {
+    if (!isStreaming) {
+      // Reset scroll tracking when not streaming
+      userHasScrolledRef.current = false;
+      return;
+    }
+
+    const container = messagesContainerRef.current;
+    if (!container || userHasScrolledRef.current) return;
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+  }, [messages, isStreaming]);
+
+  // Auto-focus input when streaming completes
+  useEffect(() => {
+    if (wasStreamingRef.current && !isStreaming) {
+      // Streaming just completed - focus the input
+      inputRef.current?.focus();
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isStreaming || isCreatingSession) return;
@@ -93,7 +141,11 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-6 space-y-4"
+      >
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-warm-brown/60">
             <div className="mb-8">
@@ -127,6 +179,7 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
       <form onSubmit={handleSubmit} className="p-4 border-t border-warm-brown/20">
         <div className="flex gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

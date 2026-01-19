@@ -1,35 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getPresentations, deletePresentation } from '@/lib/storage';
+import { useState } from 'react';
 import type { LocalPresentation } from '@/types';
 import Image from 'next/image';
 
 interface ConversationHistoryProps {
   currentSessionId?: string;
+  presentations: LocalPresentation[];
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
+  onDeleteSession: (sessionId: string) => void;
 }
 
 export function ConversationHistory({
   currentSessionId,
+  presentations,
   onSelectSession,
   onNewSession,
+  onDeleteSession,
 }: ConversationHistoryProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [presentations, setPresentations] = useState<LocalPresentation[]>([]);
-
-  useEffect(() => {
-    setPresentations(getPresentations());
-  }, []);
 
   const handleDelete = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    deletePresentation(sessionId);
-    setPresentations(getPresentations());
-    if (sessionId === currentSessionId) {
-      onNewSession();
-    }
+    onDeleteSession(sessionId);
   };
 
   if (isCollapsed) {
@@ -115,15 +109,19 @@ export function ConversationHistory({
                 <div
                   key={presentation.sessionId}
                   onClick={() => onSelectSession(presentation.sessionId)}
-                  className={`p-3 rounded-lg mb-2 cursor-pointer transition-colors group ${
+                  className={`p-3 rounded-lg mb-2 cursor-pointer transition-all group ${
                     presentation.sessionId === currentSessionId
-                      ? 'bg-fox-orange/10 border border-fox-orange/20'
-                      : 'hover:bg-warm-brown/5'
+                      ? 'bg-fox-orange/20 border-l-4 border-l-fox-orange border-y border-r border-fox-orange/30 shadow-sm'
+                      : 'hover:bg-warm-brown/5 border-l-4 border-l-transparent'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-warm-brown truncate">
+                      <p className={`text-sm font-medium truncate ${
+                        presentation.sessionId === currentSessionId
+                          ? 'text-fox-orange'
+                          : 'text-warm-brown'
+                      }`}>
                         {presentation.title || 'Untitled'}
                       </p>
                       <p className="text-xs text-warm-brown/50 mt-1">
