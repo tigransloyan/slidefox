@@ -18,22 +18,16 @@ export default function Home() {
   const hasAutoOpenedGallery = useRef(false);
 
   // Create a new session (called on demand, not on page load)
+  // Note: We don't set isLoading here because Slidefox handles its own loading state
+  // and setting isLoading would unmount Slidefox, losing the pending message
   const handleNewSession = async (): Promise<string> => {
-    setIsLoading(true);
-    try {
-      const { sessionId: newSessionId } = await createSlidefoxSession();
-      setSessionId(newSessionId);
-      setInitialMessages([]);
-      setCurrentMessages([]);
-      hasAutoOpenedGallery.current = false;
-      saveSessionToStorage(newSessionId, 'New Presentation');
-      return newSessionId;
-    } catch (error) {
-      console.error('Failed to create session:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+    const { sessionId: newSessionId } = await createSlidefoxSession();
+    setSessionId(newSessionId);
+    setInitialMessages([]);
+    setCurrentMessages([]);
+    hasAutoOpenedGallery.current = false;
+    saveSessionToStorage(newSessionId, 'New Presentation');
+    return newSessionId;
   };
 
   // Load or restore a session
