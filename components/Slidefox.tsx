@@ -284,6 +284,9 @@ function SlideProgressGroup({
   allToolCalls: UIToolCallPart[];
 }) {
   const completedSlides = allToolCalls.filter((p) => p.status === 'done').length;
+  const failedSlides = allToolCalls.filter((p) => p.status === 'error').length;
+  const cancelledSlides = allToolCalls.filter((p) => p.status === 'cancelled').length;
+  const problemSlides = failedSlides + cancelledSlides;
   const totalSlides = allToolCalls.length;
   const hasActiveImageGeneration = allToolCalls.some(
     (p) => p.status === 'pending' || p.status === 'running',
@@ -293,24 +296,66 @@ function SlideProgressGroup({
   const firstToolCallId = toolCalls[0]?.toolCallId;
   const startIndex = allToolCalls.findIndex((t) => t.toolCallId === firstToolCallId);
 
+  // Determine the overall status message
+  const renderStatusMessage = () => {
+    if (hasActiveImageGeneration) {
+      return (
+        <>
+          <span className="h-2 w-2 animate-pulse rounded-full bg-fox-orange" />
+          <span className="text-warm-brown/70">
+            Generating slides... {completedSlides}/{totalSlides}
+          </span>
+        </>
+      );
+    }
+
+    if (problemSlides > 0 && completedSlides === 0) {
+      // All slides failed or were cancelled
+      const message = cancelledSlides === problemSlides 
+        ? `Cancelled ${problemSlides} slide${problemSlides !== 1 ? 's' : ''}`
+        : `Failed to generate ${failedSlides} slide${failedSlides !== 1 ? 's' : ''}${cancelledSlides > 0 ? `, ${cancelledSlides} cancelled` : ''}`;
+      return (
+        <>
+          <span className={cancelledSlides === problemSlides ? 'text-amber-600' : 'text-red-600'}>
+            {cancelledSlides === problemSlides ? '◼' : '✗'}
+          </span>
+          <span className={cancelledSlides === problemSlides ? 'text-amber-600' : 'text-red-600'}>
+            {message}
+          </span>
+        </>
+      );
+    }
+
+    if (problemSlides > 0) {
+      // Some slides failed/cancelled, some succeeded
+      const problemParts = [];
+      if (failedSlides > 0) problemParts.push(`${failedSlides} failed`);
+      if (cancelledSlides > 0) problemParts.push(`${cancelledSlides} cancelled`);
+      return (
+        <>
+          <span className="text-amber-600">⚠</span>
+          <span className="text-warm-brown/70">
+            {completedSlides} slide{completedSlides !== 1 ? 's' : ''} generated, {problemParts.join(', ')}
+          </span>
+        </>
+      );
+    }
+
+    // All slides succeeded
+    return (
+      <>
+        <span className="text-green-600">✓</span>
+        <span className="text-warm-brown/70">
+          {totalSlides} slide{totalSlides !== 1 ? 's' : ''} generated
+        </span>
+      </>
+    );
+  };
+
   return (
     <div className="my-3 py-3 border-y border-warm-brown/10">
       <div className="flex items-center gap-2 text-sm">
-        {hasActiveImageGeneration ? (
-          <>
-            <span className="h-2 w-2 animate-pulse rounded-full bg-fox-orange" />
-            <span className="text-warm-brown/70">
-              Generating slides... {completedSlides}/{totalSlides}
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="text-green-600">✓</span>
-            <span className="text-warm-brown/70">
-              {totalSlides} slide{totalSlides !== 1 ? 's' : ''} generated
-            </span>
-          </>
-        )}
+        {renderStatusMessage()}
       </div>
 
       {/* Individual slide progress */}
