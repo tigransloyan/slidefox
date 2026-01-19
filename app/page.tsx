@@ -13,12 +13,12 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [currentMessages, setCurrentMessages] = useState<UIMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const hasAutoOpenedGallery = useRef(false);
 
-  // Create a new session
-  const handleNewSession = async () => {
+  // Create a new session (called on demand, not on page load)
+  const handleNewSession = async (): Promise<string> => {
     setIsLoading(true);
     try {
       const { sessionId: newSessionId } = await createSlidefoxSession();
@@ -27,8 +27,10 @@ export default function Home() {
       setCurrentMessages([]);
       hasAutoOpenedGallery.current = false;
       saveSessionToStorage(newSessionId, 'New Presentation');
+      return newSessionId;
     } catch (error) {
       console.error('Failed to create session:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -49,10 +51,6 @@ export default function Home() {
     }
   };
 
-  // Initialize with a new session on mount
-  useEffect(() => {
-    handleNewSession();
-  }, []);
 
   // Extract slides from current messages for gallery and PDF export
   const slides: UIFilePart[] = useMemo(() => {
@@ -73,7 +71,7 @@ export default function Home() {
     }
   }, [slides.length]);
 
-  if (isLoading || !sessionId) {
+  if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-cream-white">
         <div className="text-center">
@@ -88,7 +86,7 @@ export default function Home() {
     <div className="h-screen flex overflow-hidden bg-cream-white">
       {/* Left Sidebar - Conversation History */}
       <ConversationHistory
-        currentSessionId={sessionId}
+        currentSessionId={sessionId ?? undefined}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
       />
@@ -100,6 +98,7 @@ export default function Home() {
             sessionId={sessionId} 
             initialMessages={initialMessages}
             onMessagesChange={setCurrentMessages}
+            onCreateSession={handleNewSession}
           />
         </div>
       </div>

@@ -6,15 +6,19 @@ import ReactMarkdown from 'react-markdown';
 import Image from 'next/image';
 
 interface SlidefoxProps {
-  sessionId: string;
+  sessionId: string | null;
   initialMessages?: UIMessage[];
   onMessagesChange?: (messages: UIMessage[]) => void;
+  onCreateSession?: () => Promise<string>;
 }
 
-export function Slidefox({ sessionId, initialMessages, onMessagesChange }: SlidefoxProps) {
+export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreateSession }: SlidefoxProps) {
   const [inputValue, setInputValue] = useState('');
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   // Create transport with abort signal support for stop functionality
+  // Transport is only valid when sessionId exists
   const transport = useMemo(
     () =>
       createHttpTransport({
@@ -34,6 +38,19 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange }: Slide
     initialMessages,
   });
 
+  // When we have a sessionId and a pending message, send it
+  useEffect(() => {
+    if (sessionId && pendingMessage) {
+      const message = pendingMessage;
+      setPendingMessage(null);
+      send(
+        'user-message',
+        { USER_MESSAGE: message },
+        { userMessage: { content: message } },
+      );
+    }
+  }, [sessionId, pendingMessage, send]);
+
   // Notify parent of message changes
   useEffect(() => {
     if (onMessagesChange) {
@@ -45,16 +62,32 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange }: Slide
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || isStreaming) return;
+    if (!inputValue.trim() || isStreaming || isCreatingSession) return;
 
     const message = inputValue.trim();
     setInputValue('');
 
-    await send(
-      'user-message',
-      { USER_MESSAGE: message },
-      { userMessage: { content: message } },
-    );
+    if (!sessionId && onCreateSession) {
+      // No session yet - store message and create session
+      setPendingMessage(message);
+      setIsCreatingSession(true);
+      try {
+        await onCreateSession();
+      } catch (error) {
+        console.error('Failed to create session:', error);
+        setPendingMessage(null);
+        setInputValue(message); // Restore the message so user can retry
+      } finally {
+        setIsCreatingSession(false);
+      }
+    } else {
+      // Session exists - send directly
+      await send(
+        'user-message',
+        { USER_MESSAGE: message },
+        { userMessage: { content: message } },
+      );
+    }
   };
 
   return (
@@ -99,7 +132,7 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange }: Slide
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Describe your presentation..."
             className="flex-1 px-4 py-2 border border-warm-brown/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-fox-orange focus:border-transparent"
-            disabled={isStreaming}
+            disabled={isStreaming || isCreatingSession}
           />
           {isStreaming ? (
             <button
@@ -112,10 +145,10 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange }: Slide
           ) : (
             <button
               type="submit"
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() || isCreatingSession}
               className="px-6 py-2 bg-fox-orange text-white rounded-lg hover:bg-fox-orange-light transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Send
+              {isCreatingSession ? 'Starting...' : 'Send'}
             </button>
           )}
         </div>
