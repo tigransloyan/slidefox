@@ -246,7 +246,7 @@ export default function Home() {
   // Mobile layout
   if (isMobile) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden bg-cream-white">
+      <div className="h-[100dvh] flex flex-col overflow-hidden bg-cream-white">
         {/* Mobile Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-warm-brown/10 bg-white">
           <div className="flex items-center gap-2">
@@ -263,7 +263,7 @@ export default function Home() {
           {/* Chat View */}
           <div className={`absolute inset-0 transition-transform duration-300 ${
             mobileView === 'chat' ? 'translate-x-0' : '-translate-x-full'
-          }`}>
+          } pb-[calc(64px+env(safe-area-inset-bottom))]`}>
             <Slidefox 
               sessionId={sessionId} 
               initialMessages={initialMessages}
@@ -275,7 +275,7 @@ export default function Home() {
           {/* Gallery View */}
           <div className={`absolute inset-0 bg-white transition-transform duration-300 ${
             mobileView === 'gallery' ? 'translate-x-0' : 'translate-x-full'
-          }`}>
+          } pb-[calc(64px+env(safe-area-inset-bottom))]`}>
             {slides.length > 0 ? (
               <SlideGallery slides={slides} />
             ) : (
@@ -291,7 +291,7 @@ export default function Home() {
           {/* History View */}
           <div className={`absolute inset-0 bg-cream-white transition-transform duration-300 ${
             mobileView === 'history' ? 'translate-x-0' : 'translate-x-full'
-          }`}>
+          } pb-[calc(64px+env(safe-area-inset-bottom))]`}>
             <ConversationHistory
               currentSessionId={sessionId ?? undefined}
               presentations={presentations}
@@ -310,7 +310,7 @@ export default function Home() {
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <div className="flex border-t border-warm-brown/10 bg-white safe-area-bottom">
+        <div className="fixed bottom-0 left-0 right-0 flex border-t border-warm-brown/10 bg-white safe-area-bottom z-20">
           <button
             onClick={() => setMobileView('chat')}
             className={`flex-1 flex flex-col items-center py-3 gap-1 transition-colors ${
