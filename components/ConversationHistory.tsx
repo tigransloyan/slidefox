@@ -160,7 +160,7 @@ export function ConversationHistory({
           href="https://github.com/tigransloyan/slidefox"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 h-[51px] text-warm-brown/50 hover:text-warm-brown transition-colors"
+          className="flex items-center gap-2 h-[50px] text-warm-brown/50 hover:text-warm-brown transition-colors"
         >
           <svg
             className="w-4 h-4"

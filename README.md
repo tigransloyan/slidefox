@@ -2,14 +2,16 @@
 
 A conversational AI presentation generator built with Next.js and Octavus. Users describe what they want, an AI autonomously generates slide images in real-time, and presentations are exported as PDFs.
 
+**Try it live at [slidefox.ai](https://slidefox.ai)**
+
 ## Features
 
 - 🤖 **Agentic AI Generation** - Single prompt generates entire presentations autonomously
 - 🎨 **Real-time Streaming** - Slides appear in the gallery as they're created
 - 📱 **Three-Column Layout** - Conversation history, chat interface, and slide gallery
-- 💾 **Session Persistence** - Restore conversations from localStorage (guests) or database (authenticated)
+- 💾 **Session Persistence** - Restore conversations from localStorage and Octavus server
 - 📄 **PDF Export** - One-click download of presentations
-- 🎭 **Theme Support** - Modern, minimal, bold, corporate, and creative themes
+- 🎭 **Style Selection** - Six visual styles: modern-corporate, swiss-corporate, soft-3d-corporate, creative-pastel, playful-illustrated, and vibrant-illustrated
 
 ## Getting Started
 
@@ -72,13 +74,14 @@ slidefox/
 │   └── PDFExport.tsx           # PDF download button
 ├── lib/
 │   ├── octavus.ts              # Octavus client configuration
-│   ├── session.ts              # Session management
 │   └── storage.ts              # localStorage helpers
 ├── agent/
 │   └── slidefox/               # Agent definition
 │       ├── protocol.yaml
 │       ├── settings.json
 │       └── prompts/
+├── types/
+│   └── index.ts                # TypeScript type definitions
 └── public/
     └── fox-logo.png            # Brand logo
 ```
