@@ -1,6 +1,19 @@
-import type { UIMessage, UIFilePart, UITextPart } from '@octavus/react';
+import type { UIMessage, UIFilePart, UITextPart, UIToolCallPart, UIObjectPart } from '@octavus/react';
 
-export type { UIMessage, UIFilePart, UITextPart };
+export type { UIMessage, UIFilePart, UITextPart, UIToolCallPart, UIObjectPart };
+
+// Structured response from agent (matches protocol SlidefoxResponse)
+export interface SlideInfo {
+  slot: number;
+  headline: string;
+  slideType?: 'title' | 'content' | 'data' | 'quote' | 'section' | 'conclusion';
+}
+
+export interface SlidefoxResponse {
+  message: string;
+  slides: SlideInfo[];
+  style?: string;
+}
 
 // Slide content structure - matches protocol types
 export interface SlideContent {
@@ -9,27 +22,16 @@ export interface SlideContent {
   slideType: 'title' | 'content' | 'data' | 'quote' | 'section' | 'conclusion';
 }
 
-// Individual slide with slot tracking
+// Individual slide with slot tracking (used by frontend gallery)
 export interface Slide {
-  slot: number;                    // 1-indexed position in deck
-  content: SlideContent;           // Structured text content
-  imageUrl?: string;               // Generated image URL
-  imageToolCallId?: string;        // Links to octavus_generate_image call
+  slot: number;
+  content: SlideContent;
+  imageUrl?: string;
+  imageToolCallId?: string;
   status: 'pending' | 'generating' | 'done' | 'error';
 }
 
-// Full presentation state
-export interface Presentation {
-  sessionId: string;
-  title: string;
-  style: string;
-  slides: Slide[];
-  createdAt: number;
-  updatedAt: number;
-  exists?: boolean; // Added by API to indicate if presentation exists on server
-}
-
-// Legacy type for backward compatibility
+// For localStorage presentation history
 export interface LocalPresentation {
   sessionId: string;
   title: string;

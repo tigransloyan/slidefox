@@ -7,7 +7,7 @@ import { ConversationHistory } from '@/components/ConversationHistory';
 import { PDFExport } from '@/components/PDFExport';
 import { createSlidefoxSession, getSlidefoxSessionMessages } from './actions';
 import { getPresentations, savePresentation, deletePresentation } from '@/lib/storage';
-import type { UIMessage, UIFilePart, LocalPresentation, Slide, Presentation } from '@/types';
+import type { UIMessage, UIFilePart, UIToolCallPart, UIObjectPart, LocalPresentation, Slide, SlidefoxResponse } from '@/types';
 
 const MIN_GALLERY_WIDTH = 320;
 const MAX_GALLERY_WIDTH = 900;
@@ -18,7 +18,6 @@ export default function Home() {
   const [presentations, setPresentations] = useState<LocalPresentation[]>([]);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [currentMessages, setCurrentMessages] = useState<UIMessage[]>([]);
-  const [presentationState, setPresentationState] = useState<Presentation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryWidth, setGalleryWidth] = useState(DEFAULT_GALLERY_WIDTH);
@@ -29,38 +28,6 @@ export default function Home() {
   useEffect(() => {
     setPresentations(getPresentations());
   }, []);
-
-  // Fetch presentation state from backend
-  const fetchPresentationState = useCallback(async (sid: string) => {
-    try {
-      const response = await fetch(`/api/presentation?sessionId=${sid}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.exists) {
-          setPresentationState(data);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch presentation state:', error);
-    }
-  }, []);
-
-  // Debounced refetch when messages change (tool calls may have updated it)
-  // Only fetch after streaming settles to avoid excessive API calls
-  useEffect(() => {
-    if (!sessionId || currentMessages.length === 0) return;
-    
-    // Check if any message is still streaming
-    const isStreaming = currentMessages.some(m => m.status === 'streaming');
-    
-    // Debounce: wait 500ms after last update, or fetch immediately when streaming stops
-    const delay = isStreaming ? 1000 : 100;
-    const timer = setTimeout(() => {
-      fetchPresentationState(sessionId);
-    }, delay);
-    
-    return () => clearTimeout(timer);
-  }, [sessionId, currentMessages, fetchPresentationState]);
 
   // Handle gallery resize
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -102,7 +69,6 @@ export default function Home() {
     setSessionId(newSessionId);
     setInitialMessages([]);
     setCurrentMessages([]);
-    setPresentationState(null);
     hasAutoOpenedGallery.current = false;
     return newSessionId;
   };
@@ -116,9 +82,6 @@ export default function Home() {
       setSessionId(selectedSessionId);
       setInitialMessages(messages);
       setCurrentMessages(messages);
-      setPresentationState(null);
-      // Fetch presentation state for this session
-      await fetchPresentationState(selectedSessionId);
     } catch (error) {
       console.error('Failed to load session:', error);
     } finally {
@@ -134,66 +97,112 @@ export default function Home() {
       setSessionId(null);
       setInitialMessages([]);
       setCurrentMessages([]);
-      setPresentationState(null);
     }
   };
 
-  // Extract image files from messages (for linking to slides)
-  const imageFiles: UIFilePart[] = useMemo(() => {
-    const allMessages = currentMessages.length > 0 ? currentMessages : initialMessages;
-    return allMessages
-      .flatMap((m) => m.parts)
-      .filter(
-        (p): p is UIFilePart =>
-          p.type === 'file' && p.mediaType?.startsWith('image/') === true,
-      );
-  }, [currentMessages, initialMessages]);
+  // Helper to parse slot from image generation prompt
+  const getSlotFromPrompt = (prompt?: string): number => {
+    if (!prompt) return 0;
+    const match = prompt.match(/^#\s*SLOT[:\s]+(\d+)/im);
+    return match ? parseInt(match[1], 10) : 0;
+  };
 
-  // Build slides array using presentation state as the source of truth
-  // Images are generated in slot order, so image[0] = slot 1, image[1] = slot 2, etc.
+  // Build slides array using structured response + toolCallId-based image linking
   const slides: Slide[] = useMemo(() => {
-    // Deduplicate images by toolCallId
-    const seenToolCallIds = new Set<string>();
-    const uniqueImages = imageFiles.filter(file => {
-      if (!file.toolCallId) return true;
-      if (seenToolCallIds.has(file.toolCallId)) return false;
-      seenToolCallIds.add(file.toolCallId);
-      return true;
+    const allMessages = currentMessages.length > 0 ? currentMessages : initialMessages;
+    
+    // 1. Collect all image generation tool calls with their slots and statuses
+    const imageToolCalls = allMessages.flatMap(m => m.parts)
+      .filter((p): p is UIToolCallPart => 
+        p.type === 'tool-call' && p.toolName === 'octavus_generate_image'
+      );
+    
+    // Build toolCallId -> slot map and track tool call status per slot
+    const toolCallToSlot = new Map<string, number>();
+    const slotToolCallStatus = new Map<number, UIToolCallPart['status']>();
+    
+    imageToolCalls.forEach(tc => {
+      const slot = getSlotFromPrompt(tc.args?.prompt as string);
+      if (slot > 0) {
+        toolCallToSlot.set(tc.toolCallId, slot);
+        slotToolCallStatus.set(slot, tc.status);
+      } else {
+        console.warn('Image generation missing slot in prompt:', tc.toolCallId);
+      }
     });
 
-    // Build map: slot number -> image (images generated in order = slot order)
+    // 2. Build slot -> image map using toolCallId (handles out-of-order completion)
     const imageBySlot = new Map<number, UIFilePart>();
-    uniqueImages.forEach((img, idx) => {
-      imageBySlot.set(idx + 1, img); // slot 1 = index 0, slot 2 = index 1, etc.
-    });
+    allMessages.flatMap(m => m.parts)
+      .filter((p): p is UIFilePart => 
+        p.type === 'file' && p.mediaType?.startsWith('image/') === true
+      )
+      .forEach(file => {
+        if (file.toolCallId) {
+          const slot = toolCallToSlot.get(file.toolCallId);
+          if (slot) {
+            imageBySlot.set(slot, file);
+          }
+        }
+      });
 
-    // If presentation state exists (even if empty), use it as the source of truth
-    // This ensures deleted slides don't reappear from message history
-    if (presentationState?.exists) {
-      // Show all slides from presentation state (may be empty after deletions)
-      return (presentationState.slides || [])
+    // 3. Get slide metadata from most recent structured response
+    const structuredResponses = allMessages
+      .flatMap(m => m.parts)
+      .filter((p): p is UIObjectPart => 
+        p.type === 'object' && p.typeName === 'SlidefoxResponse'
+      );
+    
+    const latestResponse = structuredResponses[structuredResponses.length - 1];
+    const responseData = (latestResponse?.object ?? latestResponse?.partial) as SlidefoxResponse | undefined;
+
+    // Helper to determine slide status from tool call status and image presence
+    const getSlideStatus = (slot: number, hasImage: boolean): Slide['status'] => {
+      if (hasImage) return 'done';
+      const tcStatus = slotToolCallStatus.get(slot);
+      if (tcStatus === 'running') return 'generating';
+      if (tcStatus === 'error') return 'error';
+      return 'pending';
+    };
+
+    // 4. Build final slides array from structured response
+    if (responseData?.slides && responseData.slides.length > 0) {
+      return responseData.slides
         .sort((a, b) => a.slot - b.slot)
-        .map((stateSlide) => {
-          const image = imageBySlot.get(stateSlide.slot);
+        .map(info => {
+          const image = imageBySlot.get(info.slot);
           return {
-            slot: stateSlide.slot,
-            content: stateSlide.content,
-            imageUrl: image?.url || stateSlide.imageUrl,
-            imageToolCallId: image?.toolCallId || stateSlide.imageToolCallId,
-            status: stateSlide.status,
+            slot: info.slot,
+            content: { 
+              headline: info.headline, 
+              slideType: info.slideType || 'content' 
+            },
+            imageUrl: image?.url,
+            imageToolCallId: image?.toolCallId,
+            status: getSlideStatus(info.slot, !!image),
           };
         });
     }
 
-    // Fallback: no presentation state yet, build from images directly
-    return uniqueImages.map((file, index) => ({
-      slot: index + 1,
-      content: { headline: `Slide ${index + 1}`, slideType: 'content' as const },
-      imageUrl: file.url,
-      imageToolCallId: file.toolCallId,
-      status: 'done' as const,
-    }));
-  }, [imageFiles, presentationState]);
+    // 5. Fallback: no structured response yet, build from tool calls (pending/running) and images
+    const allSlots = new Set([...Array.from(slotToolCallStatus.keys()), ...Array.from(imageBySlot.keys())]);
+    if (allSlots.size > 0) {
+      return Array.from(allSlots)
+        .sort((a, b) => a - b)
+        .map(slot => {
+          const file = imageBySlot.get(slot);
+          return {
+            slot,
+            content: { headline: `Slide ${slot}`, slideType: 'content' as const },
+            imageUrl: file?.url,
+            imageToolCallId: file?.toolCallId,
+            status: getSlideStatus(slot, !!file),
+          };
+        });
+    }
+
+    return [];
+  }, [currentMessages, initialMessages]);
 
   // Auto-open gallery when first slide arrives (once per session)
   useEffect(() => {

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useOctavusChat, createHttpTransport, type UIMessage, type UIToolCallPart } from '@octavus/react';
+import { useOctavusChat, createHttpTransport, type UIMessage, type UIToolCallPart, type UIObjectPart } from '@octavus/react';
 import ReactMarkdown from 'react-markdown';
 import Image from 'next/image';
+import type { SlidefoxResponse } from '@/types';
 
 interface SlidefoxProps {
   sessionId: string | null;
@@ -176,22 +177,22 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-warm-brown/20">
-        <div className="flex gap-2">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-warm-brown/10 bg-white/50">
+        <div className="flex gap-3">
           <input
             ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Describe your presentation..."
-            className="flex-1 px-4 py-2 border border-warm-brown/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-fox-orange focus:border-transparent"
+            className="flex-1 px-4 py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow"
             disabled={isStreaming || isCreatingSession}
           />
           {isStreaming ? (
             <button
               type="button"
               onClick={stop}
-              className="px-6 py-2 bg-fox-orange text-white rounded-lg hover:bg-fox-orange-light transition-colors font-medium"
+              className="px-6 py-3 bg-fox-orange text-white rounded-xl hover:bg-fox-orange-light transition-all font-medium shadow-md shadow-fox-orange/25 hover:shadow-lg hover:shadow-fox-orange/30"
             >
               Stop
             </button>
@@ -199,7 +200,7 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
             <button
               type="submit"
               disabled={!inputValue.trim() || isCreatingSession}
-              className="px-6 py-2 bg-fox-orange text-white rounded-lg hover:bg-fox-orange-light transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-fox-orange text-white rounded-xl hover:bg-fox-orange-light transition-all font-medium shadow-md shadow-fox-orange/25 hover:shadow-lg hover:shadow-fox-orange/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {isCreatingSession ? 'Starting...' : 'Send'}
             </button>
@@ -223,33 +224,36 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === 'user';
 
-  // Separate tool calls into image generation and agent actions
+  // Separate parts into different render types
   type RenderPart = 
     | { type: 'text'; text: string; key: number }
     | { type: 'image-group'; toolCalls: UIToolCallPart[]; key: number }
-    | { type: 'agent-action'; toolCall: UIToolCallPart; key: number };
+    | { type: 'agent-action'; toolCall: UIToolCallPart; key: number }
+    | { type: 'structured-response'; part: UIObjectPart; key: number };
 
   const renderParts: RenderPart[] = [];
   let currentImageGroup: UIToolCallPart[] = [];
 
+  const flushImageGroup = () => {
+    if (currentImageGroup.length > 0) {
+      renderParts.push({ type: 'image-group', toolCalls: [...currentImageGroup], key: renderParts.length });
+      currentImageGroup = [];
+    }
+  };
+
   message.parts.forEach((part) => {
     if (part.type === 'text') {
-      // Flush any pending image group before adding text
-      if (currentImageGroup.length > 0) {
-        renderParts.push({ type: 'image-group', toolCalls: [...currentImageGroup], key: renderParts.length });
-        currentImageGroup = [];
-      }
+      flushImageGroup();
       renderParts.push({ type: 'text', text: part.text, key: renderParts.length });
+    } else if (part.type === 'object' && part.typeName === 'SlidefoxResponse') {
+      flushImageGroup();
+      renderParts.push({ type: 'structured-response', part, key: renderParts.length });
     } else if (part.type === 'tool-call') {
       if (part.toolName === 'octavus_generate_image') {
         // Group image generation calls together
         currentImageGroup.push(part);
       } else {
-        // Flush image group first
-        if (currentImageGroup.length > 0) {
-          renderParts.push({ type: 'image-group', toolCalls: [...currentImageGroup], key: renderParts.length });
-          currentImageGroup = [];
-        }
+        flushImageGroup();
         // Add agent action (slide management tools)
         renderParts.push({ type: 'agent-action', toolCall: part, key: renderParts.length });
       }
@@ -257,9 +261,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
   });
 
   // Flush remaining image group at the end
-  if (currentImageGroup.length > 0) {
-    renderParts.push({ type: 'image-group', toolCalls: currentImageGroup, key: renderParts.length });
-  }
+  flushImageGroup();
 
   // Collect all image generation tool calls for progress tracking
   const allImageToolCalls = message.parts.filter(
@@ -269,10 +271,10 @@ function MessageBubble({ message }: { message: UIMessage }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`p-4 rounded-lg max-w-2xl ${
+        className={`p-4 rounded-2xl max-w-2xl ${
           isUser
-            ? 'bg-fox-orange text-white'
-            : 'bg-white border border-warm-brown/10 text-warm-brown'
+            ? 'bg-fox-orange text-white shadow-md shadow-fox-orange/25'
+            : 'bg-white border border-warm-brown/10 text-warm-brown shadow-sm'
         }`}
       >
         {renderParts.map((part) => {
@@ -281,6 +283,13 @@ function MessageBubble({ message }: { message: UIMessage }) {
               <div key={part.key} className={`prose max-w-none ${isUser ? 'prose-invert' : ''}`}>
                 <ReactMarkdown>{part.text}</ReactMarkdown>
               </div>
+            );
+          } else if (part.type === 'structured-response') {
+            return (
+              <SlidefoxResponseRenderer
+                key={part.key}
+                part={part.part}
+              />
             );
           } else if (part.type === 'image-group') {
             return (
@@ -301,10 +310,29 @@ function MessageBubble({ message }: { message: UIMessage }) {
           return null;
         })}
 
-        {message.status === 'streaming' && allImageToolCalls.length === 0 && (
+        {message.status === 'streaming' && allImageToolCalls.length === 0 && !renderParts.some(p => p.type === 'structured-response') && (
           <StreamingIndicator hasText={renderParts.some((p) => p.type === 'text' && p.text.trim())} />
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Renders the structured SlidefoxResponse from the agent
+ */
+function SlidefoxResponseRenderer({ part }: { part: UIObjectPart }) {
+  const data = (part.object ?? part.partial) as SlidefoxResponse | undefined;
+  const isStreaming = part.status === 'streaming';
+
+  if (!data?.message) {
+    return <div className="animate-pulse h-6 bg-warm-brown/10 rounded w-3/4" />;
+  }
+
+  return (
+    <div className="prose max-w-none">
+      <ReactMarkdown>{data.message}</ReactMarkdown>
+      {isStreaming && <span className="inline-block w-0.5 h-4 bg-warm-brown/60 animate-pulse ml-0.5 align-middle" />}
     </div>
   );
 }
@@ -330,8 +358,8 @@ function AgentActionBadge({ toolCall }: { toolCall: UIToolCallPart }) {
   const detail = getActionDetail();
   
   const statusStyles = {
-    pending: 'bg-gray-50 text-gray-500 border-gray-200',
-    running: 'bg-blue-50 text-blue-600 border-blue-200',
+    pending: 'bg-white/80 text-warm-brown/50 border-warm-brown/20',
+    running: 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm',
     done: 'bg-green-50 text-green-600 border-green-200',
     error: 'bg-red-50 text-red-600 border-red-200',
     cancelled: 'bg-amber-50 text-amber-600 border-amber-200',
@@ -346,12 +374,12 @@ function AgentActionBadge({ toolCall }: { toolCall: UIToolCallPart }) {
   };
 
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2 py-1 my-1 mr-1 rounded border text-xs ${statusStyles[toolCall.status]}`}>
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 my-1 mr-1.5 rounded-lg border text-xs transition-all ${statusStyles[toolCall.status]}`}>
       <span className={toolCall.status === 'running' ? 'animate-spin' : ''}>
         {statusIcons[toolCall.status]}
       </span>
       <span className="font-medium">{displayName}</span>
-      {detail && <span className="opacity-70">({detail})</span>}
+      {detail && <span className="opacity-60">({detail})</span>}
     </div>
   );
 }
@@ -433,13 +461,13 @@ function SlideProgressGroup({
   };
 
   return (
-    <div className="my-3 py-3 border-y border-warm-brown/10">
-      <div className="flex items-center gap-2 text-sm">
+    <div className="my-3 p-4 bg-gradient-to-br from-cream-white to-fox-orange/5 rounded-xl border border-warm-brown/10 shadow-sm">
+      <div className="flex items-center gap-2.5 text-sm font-medium">
         {renderStatusMessage()}
       </div>
 
       {/* Individual slide progress */}
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex flex-wrap gap-2">
         {toolCalls.map((toolCall, i) => (
           <SlideProgressBadge
             key={toolCall.toolCallId}
@@ -474,11 +502,11 @@ function SlideProgressBadge({ index, toolCall }: { index: number; toolCall: UITo
   const slotNumber = getSlotFromToolCall(toolCall, index);
   
   const statusStyles = {
-    pending: 'bg-gray-100 text-gray-400',
-    running: 'bg-fox-orange/10 text-fox-orange animate-pulse',
-    done: 'bg-green-50 text-green-600',
-    error: 'bg-red-50 text-red-600',
-    cancelled: 'bg-amber-50 text-amber-600',
+    pending: 'bg-white/80 text-warm-brown/50 border-warm-brown/20',
+    running: 'bg-fox-orange/15 text-fox-orange border-fox-orange/30 shadow-sm',
+    done: 'bg-green-50 text-green-600 border-green-200',
+    error: 'bg-red-50 text-red-600 border-red-200',
+    cancelled: 'bg-amber-50 text-amber-600 border-amber-200',
   };
 
   const statusIcons = {
@@ -491,7 +519,7 @@ function SlideProgressBadge({ index, toolCall }: { index: number; toolCall: UITo
 
   return (
     <div
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[toolCall.status]}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${statusStyles[toolCall.status]}`}
       title={`Slide ${slotNumber}: ${toolCall.status}`}
     >
       <span className={toolCall.status === 'running' ? 'animate-spin' : ''}>

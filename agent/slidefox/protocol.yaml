@@ -1,21 +1,31 @@
-# Custom types for tool parameters
+# Custom types
 types:
-  SlideContent:
+  # Structured response types
+  SlideInfo:
+    slot:
+      type: number
+      description: Slot number (1-indexed, permanent ID)
     headline:
       type: string
-      description: The main headline text for the slide
-    body:
-      type: StringList
-      description: Bullet points or body text
-      optional: true
+      description: The slide headline
     slideType:
       type: string
       description: Layout type (title, content, data, quote, section, conclusion)
+      optional: true
 
-  StringList:
-    type: array
-    items:
+  SlidefoxResponse:
+    message:
       type: string
+      description: Response message to the user (markdown supported)
+    slides:
+      type: array
+      items:
+        type: SlideInfo
+      description: Current state of all slides in the deck, ordered by slot
+    style:
+      type: string
+      description: The visual style being used
+      optional: true
 
 # Agent inputs
 input:
@@ -33,66 +43,13 @@ triggers:
       USER_MESSAGE:
         type: string
 
-# External tools (implemented in backend)
-tools:
-  get-presentation:
-    description: Checking current slides
-    display: description
-
-  add-slide:
-    description: Adding a new slide
-    display: description
-    parameters:
-      slot:
-        type: integer
-        description: Slot number (1-indexed)
-      content:
-        type: SlideContent
-        description: Slide content
-
-  update-slide:
-    description: Updating a slide
-    display: description
-    parameters:
-      slot:
-        type: integer
-        description: Slot number to update
-      content:
-        type: SlideContent
-        description: New slide content
-
-  delete-slide:
-    description: Removing a slide
-    display: description
-    parameters:
-      slot:
-        type: integer
-        description: Slot number to delete
-
-  reorder-slide:
-    description: Swapping two slides
-    display: description
-    parameters:
-      fromSlot:
-        type: integer
-        description: First slot number to swap
-      toSlot:
-        type: integer
-        description: Second slot number to swap
-
 # Agent configuration
 agent:
-  model: anthropic/claude-sonnet-4-5
+  model: google/gemini-3-flash-preview
   system: system
   input:
     - STYLE
-  imageModel: google/gemini-2.5-flash-image
-  tools:
-    - get-presentation
-    - add-slide
-    - update-slide
-    - delete-slide
-    - reorder-slide
+  imageModel: google/gemini-3-pro-image-preview
   agentic: true
   maxSteps: 20
 
@@ -109,3 +66,4 @@ handlers:
 
     Respond to user:
       block: next-message
+      responseType: SlidefoxResponse

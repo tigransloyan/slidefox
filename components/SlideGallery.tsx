@@ -75,10 +75,10 @@ export function SlideGallery({ slides }: SlideGalleryProps) {
             return (
               <div
                 key={`slide-${slide.slot}`}
-                className={`relative aspect-[7/4] rounded-lg overflow-hidden transition-all ${
+                className={`relative rounded-lg overflow-hidden transition-all ${
                   hasImage 
                     ? 'bg-gray-100 cursor-pointer hover:ring-2 hover:ring-fox-orange' 
-                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-200'
+                    : 'aspect-[7/4] bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-200'
                 }`}
                 onClick={() => hasImage && setSelectedIndex(imageIndex)}
               >
@@ -86,8 +86,9 @@ export function SlideGallery({ slides }: SlideGalleryProps) {
                   <Image
                     src={slide.imageUrl}
                     alt={slide.content.headline || `Slide ${slide.slot}`}
-                    fill
-                    className="object-contain"
+                    width={1792}
+                    height={1024}
+                    className="w-full h-auto"
                     sizes="(max-width: 768px) 100vw, 400px"
                   />
                 ) : (
