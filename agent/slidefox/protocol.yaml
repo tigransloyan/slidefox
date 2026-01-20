@@ -49,7 +49,7 @@ agent:
   system: system
   input:
     - STYLE
-  imageModel: google/gemini-3-pro-image-preview
+  imageModel: google/gemini-2.5-flash-image
   agentic: true
   maxSteps: 20
 

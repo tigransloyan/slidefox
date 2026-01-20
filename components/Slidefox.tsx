@@ -186,9 +186,7 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
         ))}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            Error: {error.message || 'An error occurred'}
-          </div>
+          <RateLimitOrError error={error} />
         )}
       </div>
 
@@ -587,6 +585,34 @@ function StreamingIndicator({ hasText }: { hasText: boolean }) {
         className="w-2 h-2 rounded-full bg-fox-orange/60 animate-bounce"
         style={{ animationDelay: '300ms', animationDuration: '600ms' }}
       />
+    </div>
+  );
+}
+
+function RateLimitOrError({ error }: { error: Error }) {
+  const isRateLimit = error.message?.toLowerCase().includes('high demand') || 
+                      error.message?.toLowerCase().includes('rate') ||
+                      error.message?.toLowerCase().includes('limit') ||
+                      error.message?.toLowerCase().includes('429');
+
+  if (isRateLimit) {
+    return (
+      <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg">
+        <div className="flex items-start gap-3">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm">
+            {error.message || "We're experiencing high demand right now. Please try again in a few minutes."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+      Something went wrong. Please try again.
     </div>
   );
 }

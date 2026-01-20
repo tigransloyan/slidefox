@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { Slidefox } from '@/components/Slidefox';
 import { SlideGallery } from '@/components/SlideGallery';
 import { ConversationHistory } from '@/components/ConversationHistory';
@@ -250,7 +251,7 @@ export default function Home() {
         {/* Mobile Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-warm-brown/10 bg-white">
           <div className="flex items-center gap-2">
-            <img src="/fox-logo.png" alt="Slidefox" className="w-6 h-6" />
+            <Image src="/fox-logo.png" alt="Slidefox" width={24} height={24} className="w-6 h-6" />
             <h1 className="font-bold text-warm-brown text-lg">Slidefox</h1>
           </div>
           {mobileView === 'gallery' && slides.length > 0 && (
