@@ -109,20 +109,25 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  // Calculate textarea height - used on mount and when input changes
+  // Calculate textarea height - only use scrollHeight when there's content
+  // On mobile devices, empty textarea scrollHeight can be unreliable
   const calculateTextareaHeight = useCallback(() => {
     const target = inputRef.current;
     if (!target) return;
+    
+    // If empty, reset to minimum height (don't rely on scrollHeight)
+    if (!target.value.trim()) {
+      target.style.height = '';
+      target.style.overflowY = 'hidden';
+      return;
+    }
+    
+    // For non-empty content, calculate based on scrollHeight
     target.style.height = 'auto';
     const maxHeight = window.innerWidth < 768 ? 120 : 200;
     target.style.height = `${Math.min(target.scrollHeight, maxHeight)}px`;
     target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, []);
-
-  // Set initial height on mount
-  useEffect(() => {
-    calculateTextareaHeight();
-  }, [calculateTextareaHeight]);
 
   // Reset textarea height when input is cleared
   useEffect(() => {
