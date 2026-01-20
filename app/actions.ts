@@ -12,5 +12,8 @@ export async function createSlidefoxSession(theme?: string) {
 
 export async function getSlidefoxSessionMessages(sessionId: string): Promise<UIMessage[]> {
   const session = await octavus.agentSessions.getMessages(sessionId);
+  if (session.status === 'expired') {
+    return [];
+  }
   return session.messages;
 }

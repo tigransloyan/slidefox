@@ -210,33 +210,59 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
   );
 }
 
+// Tool call display names for our slide management tools
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  'get-presentation': 'Checking slides',
+  'add-slide': 'Adding slide',
+  'update-slide': 'Updating slide',
+  'delete-slide': 'Deleting slide',
+  'reorder-slide': 'Swapping slides',
+  'octavus_generate_image': 'Generating image',
+};
+
 function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === 'user';
 
-  // Group consecutive tool calls together for inline rendering
-  const renderParts: Array<{ type: 'text'; text: string; key: number } | { type: 'tool-group'; toolCalls: UIToolCallPart[]; key: number }> = [];
-  let currentToolGroup: UIToolCallPart[] = [];
+  // Separate tool calls into image generation and agent actions
+  type RenderPart = 
+    | { type: 'text'; text: string; key: number }
+    | { type: 'image-group'; toolCalls: UIToolCallPart[]; key: number }
+    | { type: 'agent-action'; toolCall: UIToolCallPart; key: number };
+
+  const renderParts: RenderPart[] = [];
+  let currentImageGroup: UIToolCallPart[] = [];
 
   message.parts.forEach((part) => {
     if (part.type === 'text') {
-      // Flush any pending tool group before adding text
-      if (currentToolGroup.length > 0) {
-        renderParts.push({ type: 'tool-group', toolCalls: [...currentToolGroup], key: renderParts.length });
-        currentToolGroup = [];
+      // Flush any pending image group before adding text
+      if (currentImageGroup.length > 0) {
+        renderParts.push({ type: 'image-group', toolCalls: [...currentImageGroup], key: renderParts.length });
+        currentImageGroup = [];
       }
       renderParts.push({ type: 'text', text: part.text, key: renderParts.length });
-    } else if (part.type === 'tool-call' && part.toolName === 'octavus_generate_image') {
-      currentToolGroup.push(part);
+    } else if (part.type === 'tool-call') {
+      if (part.toolName === 'octavus_generate_image') {
+        // Group image generation calls together
+        currentImageGroup.push(part);
+      } else {
+        // Flush image group first
+        if (currentImageGroup.length > 0) {
+          renderParts.push({ type: 'image-group', toolCalls: [...currentImageGroup], key: renderParts.length });
+          currentImageGroup = [];
+        }
+        // Add agent action (slide management tools)
+        renderParts.push({ type: 'agent-action', toolCall: part, key: renderParts.length });
+      }
     }
   });
 
-  // Flush remaining tool group at the end
-  if (currentToolGroup.length > 0) {
-    renderParts.push({ type: 'tool-group', toolCalls: currentToolGroup, key: renderParts.length });
+  // Flush remaining image group at the end
+  if (currentImageGroup.length > 0) {
+    renderParts.push({ type: 'image-group', toolCalls: currentImageGroup, key: renderParts.length });
   }
 
   // Collect all image generation tool calls for progress tracking
-  const allToolCalls = message.parts.filter(
+  const allImageToolCalls = message.parts.filter(
     (p): p is UIToolCallPart => p.type === 'tool-call' && p.toolName === 'octavus_generate_image',
   );
 
@@ -256,22 +282,76 @@ function MessageBubble({ message }: { message: UIMessage }) {
                 <ReactMarkdown>{part.text}</ReactMarkdown>
               </div>
             );
-          } else if (part.type === 'tool-group') {
+          } else if (part.type === 'image-group') {
             return (
               <SlideProgressGroup
                 key={part.key}
                 toolCalls={part.toolCalls}
-                allToolCalls={allToolCalls}
+                allToolCalls={allImageToolCalls}
+              />
+            );
+          } else if (part.type === 'agent-action') {
+            return (
+              <AgentActionBadge
+                key={part.key}
+                toolCall={part.toolCall}
               />
             );
           }
           return null;
         })}
 
-        {message.status === 'streaming' && allToolCalls.length === 0 && (
+        {message.status === 'streaming' && allImageToolCalls.length === 0 && (
           <StreamingIndicator hasText={renderParts.some((p) => p.type === 'text' && p.text.trim())} />
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Shows agent actions (tool calls other than image generation)
+ */
+function AgentActionBadge({ toolCall }: { toolCall: UIToolCallPart }) {
+  const displayName = toolCall.displayName || TOOL_DISPLAY_NAMES[toolCall.toolName] || toolCall.toolName;
+  
+  // Extract useful info from args for display
+  const getActionDetail = (): string | null => {
+    const args = toolCall.args || {};
+    if (args.slot !== undefined) {
+      return `slot ${args.slot}`;
+    }
+    if (args.fromSlot !== undefined && args.toSlot !== undefined) {
+      return `${args.fromSlot} → ${args.toSlot}`;
+    }
+    return null;
+  };
+
+  const detail = getActionDetail();
+  
+  const statusStyles = {
+    pending: 'bg-gray-50 text-gray-500 border-gray-200',
+    running: 'bg-blue-50 text-blue-600 border-blue-200',
+    done: 'bg-green-50 text-green-600 border-green-200',
+    error: 'bg-red-50 text-red-600 border-red-200',
+    cancelled: 'bg-amber-50 text-amber-600 border-amber-200',
+  };
+
+  const statusIcons = {
+    pending: '○',
+    running: '◐',
+    done: '✓',
+    error: '✗',
+    cancelled: '◼',
+  };
+
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2 py-1 my-1 mr-1 rounded border text-xs ${statusStyles[toolCall.status]}`}>
+      <span className={toolCall.status === 'running' ? 'animate-spin' : ''}>
+        {statusIcons[toolCall.status]}
+      </span>
+      <span className="font-medium">{displayName}</span>
+      {detail && <span className="opacity-70">({detail})</span>}
     </div>
   );
 }
@@ -372,7 +452,27 @@ function SlideProgressGroup({
   );
 }
 
+/**
+ * Try to extract slot number from tool call args.
+ * The agent should include slot info, but we fallback to the provided index.
+ */
+function getSlotFromToolCall(toolCall: UIToolCallPart, fallbackIndex: number): number {
+  // Try to parse slot from the prompt (agent may include "# SLOT: N" in the prompt)
+  const prompt = toolCall.args?.prompt as string | undefined;
+  if (prompt) {
+    const slotMatch = prompt.match(/^#\s*SLOT[:\s]+(\d+)/im);
+    if (slotMatch) {
+      return parseInt(slotMatch[1], 10);
+    }
+  }
+  // Fallback to position-based index
+  return fallbackIndex;
+}
+
 function SlideProgressBadge({ index, toolCall }: { index: number; toolCall: UIToolCallPart }) {
+  // Try to get slot from tool call, fallback to position-based index
+  const slotNumber = getSlotFromToolCall(toolCall, index);
+  
   const statusStyles = {
     pending: 'bg-gray-100 text-gray-400',
     running: 'bg-fox-orange/10 text-fox-orange animate-pulse',
@@ -392,12 +492,12 @@ function SlideProgressBadge({ index, toolCall }: { index: number; toolCall: UITo
   return (
     <div
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[toolCall.status]}`}
-      title={`Slide ${index}: ${toolCall.status}`}
+      title={`Slide ${slotNumber}: ${toolCall.status}`}
     >
       <span className={toolCall.status === 'running' ? 'animate-spin' : ''}>
         {statusIcons[toolCall.status]}
       </span>
-      <span>Slide {index}</span>
+      <span>Slide {slotNumber}</span>
     </div>
   );
 }

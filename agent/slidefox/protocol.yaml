@@ -1,4 +1,23 @@
-# Agent configuration
+# Custom types for tool parameters
+types:
+  SlideContent:
+    headline:
+      type: string
+      description: The main headline text for the slide
+    body:
+      type: StringList
+      description: Bullet points or body text
+      optional: true
+    slideType:
+      type: string
+      description: Layout type (title, content, data, quote, section, conclusion)
+
+  StringList:
+    type: array
+    items:
+      type: string
+
+# Agent inputs
 input:
   STYLE:
     type: string
@@ -6,6 +25,7 @@ input:
     optional: true
     default: auto
 
+# Triggers
 triggers:
   user-message:
     description: User describes their presentation
@@ -13,15 +33,70 @@ triggers:
       USER_MESSAGE:
         type: string
 
+# External tools (implemented in backend)
+tools:
+  get-presentation:
+    description: Checking current slides
+    display: description
+
+  add-slide:
+    description: Adding a new slide
+    display: description
+    parameters:
+      slot:
+        type: integer
+        description: Slot number (1-indexed)
+      content:
+        type: SlideContent
+        description: Slide content
+
+  update-slide:
+    description: Updating a slide
+    display: description
+    parameters:
+      slot:
+        type: integer
+        description: Slot number to update
+      content:
+        type: SlideContent
+        description: New slide content
+
+  delete-slide:
+    description: Removing a slide
+    display: description
+    parameters:
+      slot:
+        type: integer
+        description: Slot number to delete
+
+  reorder-slide:
+    description: Swapping two slides
+    display: description
+    parameters:
+      fromSlot:
+        type: integer
+        description: First slot number to swap
+      toSlot:
+        type: integer
+        description: Second slot number to swap
+
+# Agent configuration
 agent:
   model: anthropic/claude-sonnet-4-5
   system: system
   input:
     - STYLE
   imageModel: google/gemini-2.5-flash-image
+  tools:
+    - get-presentation
+    - add-slide
+    - update-slide
+    - delete-slide
+    - reorder-slide
   agentic: true
   maxSteps: 20
 
+# Handlers
 handlers:
   user-message:
     Add user message:
@@ -32,5 +107,5 @@ handlers:
         - USER_MESSAGE
       display: hidden
 
-    Generate presentation:
+    Respond to user:
       block: next-message

@@ -47,25 +47,24 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create a page with 16:9 aspect ratio (1792x1024)
-        // Standard US Letter is 8.5x11 inches, but we'll use a 16:9 page
-        const pageWidth = 11 * 72; // 11 inches in points
-        const pageHeight = (11 * 72) / (16 / 9); // Maintain 16:9 ratio
+        // Get the actual image dimensions
+        const imageDims = image.scale(1);
+        
+        // Create a page that matches the image aspect ratio
+        // Target width of ~11 inches (792 points), scale height to match image aspect ratio
+        const targetWidth = 11 * 72; // 11 inches in points
+        const aspectRatio = imageDims.width / imageDims.height;
+        const pageWidth = targetWidth;
+        const pageHeight = targetWidth / aspectRatio;
         
         const page = pdfDoc.addPage([pageWidth, pageHeight]);
         
-        // Scale image to fit page while maintaining aspect ratio
-        const imageDims = image.scale(1);
-        const scale = Math.min(
-          pageWidth / imageDims.width,
-          pageHeight / imageDims.height,
-        );
-        
+        // Draw image to fill the entire page (no borders)
         page.drawImage(image, {
-          x: (pageWidth - imageDims.width * scale) / 2,
-          y: (pageHeight - imageDims.height * scale) / 2,
-          width: imageDims.width * scale,
-          height: imageDims.height * scale,
+          x: 0,
+          y: 0,
+          width: pageWidth,
+          height: pageHeight,
         });
       } catch (error) {
         console.error(`Error processing slide ${url}:`, error);
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
     const pdfBytes = await pdfDoc.save();
 
     // Return PDF as response
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'attachment; filename="presentation.pdf"',

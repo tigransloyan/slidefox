@@ -1,21 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import type { UIFilePart } from '@/types';
+import type { Slide } from '@/types';
 
 interface PDFExportProps {
-  slides: UIFilePart[];
+  slides: Slide[];
 }
 
 export function PDFExport({ slides }: PDFExportProps) {
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Filter to slides with images
+  const slidesWithImages = slides.filter(s => s.imageUrl);
+
   const handleExport = async () => {
-    if (slides.length === 0) return;
+    if (slidesWithImages.length === 0) return;
 
     setIsGenerating(true);
     try {
-      const slideUrls = slides.map((slide) => slide.url);
+      // Sort by slot number and extract URLs
+      const slideUrls = slidesWithImages
+        .sort((a, b) => a.slot - b.slot)
+        .map((slide) => slide.imageUrl!)
+        .filter(Boolean);
 
       const response = await fetch('/api/slides/pdf', {
         method: 'POST',
@@ -44,7 +51,7 @@ export function PDFExport({ slides }: PDFExportProps) {
     }
   };
 
-  if (slides.length === 0) {
+  if (slidesWithImages.length === 0) {
     return null;
   }
 
