@@ -109,13 +109,27 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  // Reset textarea height and overflow when input is cleared
+  // Calculate textarea height - used on mount and when input changes
+  const calculateTextareaHeight = useCallback(() => {
+    const target = inputRef.current;
+    if (!target) return;
+    target.style.height = 'auto';
+    const maxHeight = window.innerWidth < 768 ? 120 : 200;
+    target.style.height = `${Math.min(target.scrollHeight, maxHeight)}px`;
+    target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  // Set initial height on mount
   useEffect(() => {
-    if (!inputValue && inputRef.current) {
-      inputRef.current.style.height = 'auto';
-      inputRef.current.style.overflowY = 'hidden';
+    calculateTextareaHeight();
+  }, [calculateTextareaHeight]);
+
+  // Reset textarea height when input is cleared
+  useEffect(() => {
+    if (!inputValue) {
+      calculateTextareaHeight();
     }
-  }, [inputValue]);
+  }, [inputValue, calculateTextareaHeight]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,17 +214,9 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
             onKeyDown={handleKeyDown}
             placeholder="Describe your presentation..."
             rows={1}
-            className="flex-1 px-3 py-2.5 md:px-4 md:py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow resize-none min-h-[44px] md:min-h-[48px] max-h-[120px] md:max-h-[200px] overflow-y-hidden text-base"
+            className="flex-1 px-3 py-2.5 md:px-4 md:py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow resize-none min-h-[44px] md:min-h-[50px] max-h-[120px] md:max-h-[200px] overflow-y-hidden text-base"
             disabled={isStreaming || isCreatingSession}
-            style={{ height: 'auto' }}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = 'auto';
-              const maxHeight = window.innerWidth < 768 ? 120 : 200;
-              target.style.height = `${Math.min(target.scrollHeight, maxHeight)}px`;
-              // Only show overflow when content exceeds max height
-              target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
-            }}
+            onInput={calculateTextareaHeight}
           />
           {isStreaming ? (
             <button
