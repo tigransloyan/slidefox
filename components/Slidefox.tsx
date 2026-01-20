@@ -20,7 +20,7 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
   
   // Refs for auto-scroll and auto-focus
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const userHasScrolledRef = useRef(false);
   const wasStreamingRef = useRef(false);
 
@@ -109,6 +109,13 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
+  // Reset textarea height when input is cleared
+  useEffect(() => {
+    if (!inputValue && inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, [inputValue]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isStreaming || isCreatingSession) return;
@@ -136,6 +143,14 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
         { USER_MESSAGE: message },
         { userMessage: { content: message } },
       );
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter without Shift, allow new line on Shift+Enter
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
     }
   };
 
@@ -178,15 +193,22 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
 
       {/* Input */}
       <form onSubmit={handleSubmit} className="p-4 border-t border-warm-brown/10 bg-white/50">
-        <div className="flex gap-3">
-          <input
+        <div className="flex gap-3 items-end">
+          <textarea
             ref={inputRef}
-            type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Describe your presentation..."
-            className="flex-1 px-4 py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow"
+            rows={1}
+            className="flex-1 px-4 py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow resize-none min-h-[48px] max-h-[200px] overflow-y-auto"
             disabled={isStreaming || isCreatingSession}
+            style={{ height: 'auto' }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+            }}
           />
           {isStreaming ? (
             <button
@@ -279,8 +301,16 @@ function MessageBubble({ message }: { message: UIMessage }) {
       >
         {renderParts.map((part) => {
           if (part.type === 'text') {
+            // Render user messages as plain text, agent messages as markdown
+            if (isUser) {
+              return (
+                <div key={part.key} className="whitespace-pre-wrap">
+                  {part.text}
+                </div>
+              );
+            }
             return (
-              <div key={part.key} className={`prose max-w-none ${isUser ? 'prose-invert' : ''}`}>
+              <div key={part.key} className="prose max-w-none">
                 <ReactMarkdown>{part.text}</ReactMarkdown>
               </div>
             );

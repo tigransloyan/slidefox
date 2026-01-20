@@ -104,8 +104,8 @@ slidefox/
 
 - **Frontend**: Next.js 14+ (App Router), React, Tailwind CSS
 - **Agent Platform**: Octavus SDK (`@octavus/react`, `@octavus/server-sdk`)
-- **LLM**: Claude Sonnet 4.5 (via Octavus)
-- **Image Generation**: Gemini 2.5 Flash (via Octavus)
+- **LLM**: Geminie 3.0 Flash (via Octavus)
+- **Image Generation**: Nano-Banana (via Octavus)
 - **PDF Generation**: pdf-lib
 
 ## License
