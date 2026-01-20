@@ -10,8 +10,6 @@ import { getPresentations, savePresentation, deletePresentation } from '@/lib/st
 import type { UIMessage, UIFilePart, UIToolCallPart, UIObjectPart, LocalPresentation, Slide, SlidefoxResponse } from '@/types';
 
 const MIN_GALLERY_WIDTH = 320;
-const MAX_GALLERY_WIDTH = 900;
-const DEFAULT_GALLERY_WIDTH = 576;
 
 export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -20,7 +18,7 @@ export default function Home() {
   const [currentMessages, setCurrentMessages] = useState<UIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [galleryWidth, setGalleryWidth] = useState(DEFAULT_GALLERY_WIDTH);
+  const [galleryWidth, setGalleryWidth] = useState<number | null>(null); // null = 50% (CSS flex)
   const [isResizing, setIsResizing] = useState(false);
   const hasAutoOpenedGallery = useRef(false);
 
@@ -40,7 +38,7 @@ export default function Home() {
 
     const handleMouseMove = (e: MouseEvent) => {
       const newWidth = window.innerWidth - e.clientX;
-      setGalleryWidth(Math.min(MAX_GALLERY_WIDTH, Math.max(MIN_GALLERY_WIDTH, newWidth)));
+      setGalleryWidth(Math.max(MIN_GALLERY_WIDTH, newWidth));
     };
 
     const handleMouseUp = () => {
@@ -249,8 +247,8 @@ export default function Home() {
       {/* Right Panel - Slide Gallery */}
       {isGalleryOpen ? (
         <div 
-          className="border-l border-warm-brown/10 bg-white flex flex-col relative"
-          style={{ width: galleryWidth }}
+          className={`border-l border-warm-brown/10 bg-white flex flex-col relative ${galleryWidth === null ? 'flex-1' : ''}`}
+          style={galleryWidth !== null ? { width: galleryWidth } : undefined}
         >
           {/* Resize handle */}
           <div
