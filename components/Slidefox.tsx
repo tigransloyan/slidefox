@@ -109,10 +109,11 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  // Reset textarea height when input is cleared
+  // Reset textarea height and overflow when input is cleared
   useEffect(() => {
     if (!inputValue && inputRef.current) {
       inputRef.current.style.height = 'auto';
+      inputRef.current.style.overflowY = 'hidden';
     }
   }, [inputValue]);
 
@@ -173,8 +174,8 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
                 className="object-contain"
               />
             </div>
-            <p className="text-lg font-medium">Describe your presentation to get started</p>
-            <p className="text-sm mt-2">
+            <p className="text-lg font-medium text-center">Describe your presentation to get started</p>
+            <p className="text-sm mt-2 text-center px-4">
               Example: &quot;Create a 5-slide deck about climate change&quot;
             </p>
           </div>
@@ -192,8 +193,8 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-warm-brown/10 bg-white/50">
-        <div className="flex gap-3 items-end">
+      <form onSubmit={handleSubmit} className="p-3 md:p-4 border-t border-warm-brown/10 bg-white/50">
+        <div className="flex gap-2 md:gap-3 items-end">
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -201,20 +202,23 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
             onKeyDown={handleKeyDown}
             placeholder="Describe your presentation..."
             rows={1}
-            className="flex-1 px-4 py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow resize-none min-h-[48px] max-h-[200px] overflow-y-auto"
+            className="flex-1 px-3 py-2.5 md:px-4 md:py-3 border border-warm-brown/15 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fox-orange/50 focus:border-fox-orange/30 transition-shadow resize-none min-h-[44px] md:min-h-[48px] max-h-[120px] md:max-h-[200px] overflow-y-hidden text-base"
             disabled={isStreaming || isCreatingSession}
             style={{ height: 'auto' }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
               target.style.height = 'auto';
-              target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+              const maxHeight = window.innerWidth < 768 ? 120 : 200;
+              target.style.height = `${Math.min(target.scrollHeight, maxHeight)}px`;
+              // Only show overflow when content exceeds max height
+              target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
             }}
           />
           {isStreaming ? (
             <button
               type="button"
               onClick={stop}
-              className="px-6 py-3 bg-fox-orange text-white rounded-xl hover:bg-fox-orange-light transition-all font-medium shadow-md shadow-fox-orange/25 hover:shadow-lg hover:shadow-fox-orange/30"
+              className="px-4 py-2.5 md:px-6 md:py-3 bg-fox-orange text-white rounded-xl hover:bg-fox-orange-light active:bg-fox-orange-light transition-all font-medium shadow-md shadow-fox-orange/25 hover:shadow-lg hover:shadow-fox-orange/30 text-sm md:text-base"
             >
               Stop
             </button>
@@ -222,7 +226,7 @@ export function Slidefox({ sessionId, initialMessages, onMessagesChange, onCreat
             <button
               type="submit"
               disabled={!inputValue.trim() || isCreatingSession}
-              className="px-6 py-3 bg-fox-orange text-white rounded-xl hover:bg-fox-orange-light transition-all font-medium shadow-md shadow-fox-orange/25 hover:shadow-lg hover:shadow-fox-orange/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+              className="px-4 py-2.5 md:px-6 md:py-3 bg-fox-orange text-white rounded-xl hover:bg-fox-orange-light active:bg-fox-orange-light transition-all font-medium shadow-md shadow-fox-orange/25 hover:shadow-lg hover:shadow-fox-orange/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none text-sm md:text-base"
             >
               {isCreatingSession ? 'Starting...' : 'Send'}
             </button>

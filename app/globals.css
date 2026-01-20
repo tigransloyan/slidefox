@@ -22,3 +22,32 @@ body {
     background-position: 200% 0;
   }
 }
+
+/* Mobile safe area support for iPhone notch/home indicator */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Smooth transitions for mobile view switching */
+@media (max-width: 767px) {
+  /* Prevent text selection during swipe gestures */
+  .mobile-view-transition {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Optimize scrolling on mobile */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  
+  /* Touch-friendly tap targets */
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

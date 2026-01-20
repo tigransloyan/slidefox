@@ -59,7 +59,7 @@ export function PDFExport({ slides }: PDFExportProps) {
     <button
       onClick={handleExport}
       disabled={isGenerating}
-      className="px-4 py-2 bg-fox-orange text-white rounded-lg hover:bg-fox-orange-light transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      className="px-3 py-1.5 md:px-4 md:py-2 bg-fox-orange text-white rounded-lg hover:bg-fox-orange-light active:bg-fox-orange-light transition-colors font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 md:gap-2"
     >
       {isGenerating ? (
         <>

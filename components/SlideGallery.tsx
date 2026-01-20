@@ -149,21 +149,21 @@ export function SlideGallery({ slides }: SlideGalleryProps) {
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
           onClick={close}
         >
-          {/* Previous button */}
+          {/* Previous button - larger touch target on mobile */}
           <button
             onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
             disabled={selectedIndex === 0}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-full transition-colors z-10"
+            className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 active:bg-white/40 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-full transition-colors z-10"
             aria-label="Previous slide"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 
-          {/* Slide container */}
+          {/* Slide container - less margin on mobile */}
           <div 
-            className="relative w-full h-full max-w-7xl mx-16 my-8"
+            className="relative w-full h-full max-w-7xl mx-12 md:mx-16 my-16 md:my-8"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -175,26 +175,26 @@ export function SlideGallery({ slides }: SlideGalleryProps) {
             />
           </div>
 
-          {/* Next button */}
+          {/* Next button - larger touch target on mobile */}
           <button
             onClick={(e) => { e.stopPropagation(); goToNext(); }}
             disabled={selectedIndex === slidesWithImages.length - 1}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-full transition-colors z-10"
+            className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 active:bg-white/40 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-full transition-colors z-10"
             aria-label="Next slide"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
 
-          {/* Top bar with close and slide counter */}
-          <div className="absolute top-4 left-0 right-0 flex items-center justify-between px-4 z-10">
-            <div className="bg-black/60 text-white text-sm px-3 py-1.5 rounded-lg">
-              Slide {selectedSlide.slot} ({selectedIndex + 1} / {slidesWithImages.length})
+          {/* Top bar with close and slide counter - safe area aware */}
+          <div className="absolute top-4 left-0 right-0 flex items-center justify-between px-3 md:px-4 z-10 safe-area-top">
+            <div className="bg-black/60 text-white text-xs md:text-sm px-2.5 py-1.5 md:px-3 rounded-lg">
+              {selectedIndex + 1} / {slidesWithImages.length}
             </div>
             <button
               onClick={close}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
+              className="bg-white/20 hover:bg-white/30 active:bg-white/40 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg transition-colors text-sm md:text-base"
             >
               Close
             </button>
