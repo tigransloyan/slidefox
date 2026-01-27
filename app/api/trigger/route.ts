@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { toSSEStream } from '@octavus/server-sdk';
+import { toSSEStream, type SessionRequest } from '@octavus/server-sdk';
 import { getOctavus } from '@/lib/octavus';
 import { ratelimit } from '@/lib/ratelimit';
 
@@ -31,13 +31,14 @@ export async function POST(request: NextRequest) {
     console.error('Rate limit check failed:', e);
   }
 
-  const { sessionId, triggerName, input } = await request.json();
+  const body = (await request.json()) as { sessionId: string } & SessionRequest;
+  const { sessionId, ...sessionRequest } = body;
 
   // Attach to session (no custom tools needed - structured output handles slide tracking)
   const session = getOctavus().agentSessions.attach(sessionId);
 
-  // Trigger the action with abort signal support
-  const events = session.trigger(triggerName, input, {
+  // Execute the request with abort signal support
+  const events = session.execute(sessionRequest, {
     signal: request.signal,
   });
 

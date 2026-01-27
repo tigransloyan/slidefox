@@ -9,8 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@octavus/react": "^1.0.0",
-    "@octavus/server-sdk": "^1.0.0",
+    "@octavus/react": "^2.0.0",
+    "@octavus/server-sdk": "^2.0.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.1",
     "@vercel/analytics": "^1.6.1",
@@ -22,7 +22,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@octavus/cli": "^1.0.0",
+    "@octavus/cli": "^2.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.0",
